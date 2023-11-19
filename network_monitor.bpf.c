@@ -21,7 +21,7 @@
  */
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
-	__uint(max_entries, 2);
+	__uint(max_entries, 1024);
 	__type(key, __u16);
 	__type(value, struct l3proto_stats);
 } l3protos_stats SEC(".maps");
