@@ -1,6 +1,10 @@
 # Network monitoring with eBPF
 
-Initial program for the network monitoring with eBPF lab of the software networking course
+This project is a POC of a traffic monitoring system using eBPF.
+
+It was created in a lab in the Software Networking 2024-25 course at the Politecnico di Torino taught by Professor Fulvio Risso.
+
+Special thanks to [Federico Parola](https://github.com/FedeParola "FedeParola on GitHub") who created the initial structure of the project.
 
 ## Building
 
