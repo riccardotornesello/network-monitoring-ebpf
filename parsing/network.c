@@ -17,8 +17,8 @@ int parse_ipv4(void *start, void *data_end, void **transport_start, struct stats
     *transport_start = start + sizeof(*l2_hdr);
 
     key->l3_proto = l2_hdr->protocol;
-    key->src_addr.ipv4 = bpf_ntohl(l2_hdr->saddr);
-    key->dst_addr.ipv4 = bpf_ntohl(l2_hdr->daddr);
+    key->src_addr.ipv4 = l2_hdr->saddr;
+    key->dst_addr.ipv4 = l2_hdr->daddr;
 
     return 0;
 }

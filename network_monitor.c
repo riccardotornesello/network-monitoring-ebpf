@@ -4,6 +4,7 @@
 #include <net/if.h>
 #include <signal.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 #include "network_monitor.h"
 #include "network_monitor.skel.h"
 
@@ -14,13 +15,25 @@ static void handle_sigint(int signo)
 	stop = 1;
 }
 
-static char *ethtype_to_proto(__u16 ethtype)
-{
-	switch (ethtype) {
-		case ETH_P_IP: return "IPv4";
-		case ETH_P_ARP: return "ARP";
-		case ETH_P_IPV6: return "IPv6";
-		default: return "Unknown";
+static void print_ip(ip_address address, unsigned short l2_proto) {
+	if (l2_proto == ETH_P_IP) {
+		char ipv4_str[INET_ADDRSTRLEN];
+		inet_ntop(AF_INET,&address.ipv4,ipv4_str,INET_ADDRSTRLEN);
+		printf("%s\t",ipv4_str);
+	} else if (l2_proto == ETH_P_IPV6) {
+		char ipv6_str[INET6_ADDRSTRLEN];
+		inet_ntop(AF_INET6,&address.ipv6,ipv6_str,INET6_ADDRSTRLEN);
+		printf("%s\t",ipv6_str);
+	} else {
+		printf("-\t");
+	}
+}
+
+static void print_port(unsigned short port) {
+	if (port == 0) {
+		printf("-\t");
+	} else {
+		printf("%d\t", port);
 	}
 }
 
@@ -29,6 +42,9 @@ static int dump_l3protos_map(struct bpf_map *map)
 {
 	int err;
 	struct stats_key key;
+
+	printf("\033[H\033[J");
+	printf("# Source IP\tsport\tDestination IP\tdport\tproto\tpkt\tbytes\n\n");
 
 	/* This libbpf helper allows to iterate over all keys of an eBPF map.
 	 * Refer to its definition in libbpf.h for more details on how it works
@@ -41,7 +57,12 @@ static int dump_l3protos_map(struct bpf_map *map)
 			return -1;
 		}
 
-		printf("IP hex: %x\n", key.src_addr.ipv4);
+		printf("* ");
+		print_ip(key.src_addr,key.l2_proto);
+		print_port(key.src_port);
+		print_ip(key.dst_addr,key.l2_proto);
+		print_port(key.dst_port);
+		printf("-\t%ld\t%ld\n", val.pkts, val.bytes); // TODO: proto
 
 		err = bpf_map__get_next_key(map, &key, &key, sizeof(key));
 	}
@@ -140,8 +161,6 @@ int main(int argc, char **argv)
 		err = dump_l3protos_map(skel->maps.l3protos_stats);
 		if (err)
 			goto cleanup;
-
-		printf("\n");
 	}
 
 cleanup:

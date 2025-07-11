@@ -53,5 +53,7 @@ int parse_transport_layer(void *start, void *data_end, struct stats_key *key)
         break;
     }
 
+    // TODO: ICMP
+
     return err;
 }
