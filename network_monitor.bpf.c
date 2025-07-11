@@ -18,6 +18,7 @@
 
 #include "parsing/datalink.c"
 #include "parsing/network.c"
+#include "parsing/transport.c"
 
 /* Define a hash map with key of type __u16 (the size of the ethertype), value
  * of type struct stats_value and a max size of 1024 elements
@@ -54,15 +55,16 @@ int tc_prog(struct __sk_buff *ctx)
 		return err;
 	}
 
-	// TODO: remove
-	if (key.l2_proto != ETH_P_IP) {
-		return TC_ACT_OK;
-	}
-
 	/* Get the L3 protocol from the correct L2 header */
 	void *transport_start = 0;
 
 	err = parse_network_layer(network_start, data_end, &transport_start, &key);
+	if (err != 0) {
+		return err;
+	}
+
+	/* Get the ports (L4) */
+	err = parse_transport_layer(transport_start, data_end, &key);
 	if (err != 0) {
 		return err;
 	}

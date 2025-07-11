@@ -14,6 +14,9 @@ struct stats_key
 
 	ip_address src_addr;
 	ip_address dst_addr;
+
+	unsigned short src_port;
+	unsigned short dst_port;
 };
 
 struct stats_value
