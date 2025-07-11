@@ -4,7 +4,7 @@ network_monitor: network_monitor.c network_monitor.h network_monitor.skel.h
 network_monitor.skel.h: network_monitor.bpf.o
 	bpftool gen skeleton ./network_monitor.bpf.o > network_monitor.skel.h
 
-network_monitor.bpf.o: network_monitor.bpf.c network_monitor.h
+network_monitor.bpf.o: network_monitor.bpf.c network_monitor.h parsing/*
 	clang -g -O2 -target bpf -c network_monitor.bpf.c		\
 	      -o network_monitor.bpf.o
 

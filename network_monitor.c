@@ -28,7 +28,7 @@ static char *ethtype_to_proto(__u16 ethtype)
 static int dump_l3protos_map(struct bpf_map *map)
 {
 	int err;
-	__u16 key;
+	struct stats_key key;
 
 	/* This libbpf helper allows to iterate over all keys of an eBPF map.
 	 * Refer to its definition in libbpf.h for more details on how it works
@@ -36,15 +36,12 @@ static int dump_l3protos_map(struct bpf_map *map)
 	err = bpf_map__get_next_key(map, NULL, &key, sizeof(key));
 	while (!err) {
 		struct stats_value val;
-		if (bpf_map__lookup_elem(map, &key, sizeof(key), &val,
-					 sizeof(val), 0)) {
-			fprintf(stderr, "Error reading key 0x%04x from map: "
-				"%s\n", key, strerror(errno));
+		if (bpf_map__lookup_elem(map, &key, sizeof(key), &val, sizeof(val), 0)) {
+			fprintf(stderr, "Error reading key from map: %s\n", strerror(errno));
 			return -1;
 		}
 
-		printf("Proto %s: %lu pkts, %lu bytes\n",
-		       ethtype_to_proto(bpf_ntohs(key)), val.pkts, val.bytes);
+		printf("IP hex: %x\n", key.src_addr.ipv4);
 
 		err = bpf_map__get_next_key(map, &key, &key, sizeof(key));
 	}

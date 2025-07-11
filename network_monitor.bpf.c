@@ -16,13 +16,16 @@
 #include <bpf/bpf_helpers.h> /* Other libbpf helpers (e.g., bpf_printk()) */
 #include "network_monitor.h"
 
+#include "parsing/datalink.c"
+#include "parsing/network.c"
+
 /* Define a hash map with key of type __u16 (the size of the ethertype), value
  * of type struct stats_value and a max size of 1024 elements
  */
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, 1024);
-	__type(key, __u16);
+	__type(key, struct stats_key);
 	__type(value, struct stats_value);
 } l3protos_stats SEC(".maps");
 
@@ -40,23 +43,33 @@ int tc_prog(struct __sk_buff *ctx)
 	void *data = (void *)(unsigned long)ctx->data;
 	void *data_end = (void *)(unsigned long)ctx->data_end;
 
-	/* Interpret the first part of the packet as an ethernet header */
-	struct ethhdr *eth = data;
+	/* Initialize the stats key struct */
+	struct stats_key key = {0};
 
-	/* Every time we access the packet buffer the eBPF verifier requires us
-	 * to explicitly check that the address we are accessing doesn't exceed
-	 * the buffer limits
-	 */
-	if (data + sizeof(*eth) > data_end) {
-		/* The packet is malformed, the TC_ACT_SHOT return code
-		 * instructs the kernel to drop it
-		 */
-		return TC_ACT_SHOT;
+	/* Get the L2 protocol from the Ethernet header */
+	void *network_start = 0;
+
+	int err = parse_eth(data, data_end, &network_start, &key);
+	if (err != 0) {
+		return err;
+	}
+
+	// TODO: remove
+	if (key.l2_proto != ETH_P_IP) {
+		return TC_ACT_OK;
+	}
+
+	/* Get the L3 protocol from the correct L2 header */
+	void *transport_start = 0;
+
+	err = parse_network_layer(network_start, data_end, &transport_start, &key);
+	if (err != 0) {
+		return err;
 	}
 
 	/* Look for an existing entry in the hash map */
 	struct stats_value *val;
-	val = bpf_map_lookup_elem(&l3protos_stats, &eth->h_proto);
+	val = bpf_map_lookup_elem(&l3protos_stats, &key);
 
 	/* The value might be NULL if there is no element for the given key
 	 * (i.e., this is the first packet we process with this ethertype).
@@ -77,8 +90,7 @@ int tc_prog(struct __sk_buff *ctx)
 		 * use the BPF_NOEXIST flag, that adds the entry only if it
 		 * doesn't already exist
 		 */
-		int rc = bpf_map_update_elem(&l3protos_stats, &eth->h_proto,
-					     &new_val, BPF_NOEXIST);
+		int rc = bpf_map_update_elem(&l3protos_stats, &key, &new_val, BPF_NOEXIST);
 		if (rc != 0 && rc != -EEXIST) {
 			/* The update failed (rc != 0), and it's not beacuse the
 			 * entry already existed (rc != -EEXIST). The map is
@@ -89,7 +101,7 @@ int tc_prog(struct __sk_buff *ctx)
 		}
 
 		/* Retrieve a pointer to the newly inserted value */
-		val = bpf_map_lookup_elem(&l3protos_stats, &eth->h_proto);
+		val = bpf_map_lookup_elem(&l3protos_stats, &key);
 		if (!val) {
 			/* This should never happen, however the check is
 			 * MANDATORY for the verifier to guarantee the safety
@@ -111,8 +123,6 @@ int tc_prog(struct __sk_buff *ctx)
 	 * /sys/kernel/debug/tracing/trace_pipe. The function bpf_printk() is a
 	 * libbpf wrapper around the actual eBPF helper
 	 */
-	bpf_printk("Processed packet with l3proto 0x%04x\n",
-		   bpf_ntohs(eth->h_proto));
 
 	/* The TC_ACT_OK return code lets the packet proceed up in the network
 	 * stack for ingress packets or out of a net device for egress ones
