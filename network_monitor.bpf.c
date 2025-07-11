@@ -17,13 +17,13 @@
 #include "network_monitor.h"
 
 /* Define a hash map with key of type __u16 (the size of the ethertype), value
- * of type struct l3proto_stats and a max size of 1024 elements
+ * of type struct stats_value and a max size of 1024 elements
  */
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, 1024);
 	__type(key, __u16);
-	__type(value, struct l3proto_stats);
+	__type(value, struct stats_value);
 } l3protos_stats SEC(".maps");
 
 /* The main program that will be executed every time the hook is triggered.
@@ -55,7 +55,7 @@ int tc_prog(struct __sk_buff *ctx)
 	}
 
 	/* Look for an existing entry in the hash map */
-	struct l3proto_stats *val;
+	struct stats_value *val;
 	val = bpf_map_lookup_elem(&l3protos_stats, &eth->h_proto);
 
 	/* The value might be NULL if there is no element for the given key
@@ -67,7 +67,7 @@ int tc_prog(struct __sk_buff *ctx)
 	 */
 	if (!val) {
 		/* Preapare a new entry for the given ethertype */
-		struct l3proto_stats new_val;
+		struct stats_value new_val;
 		new_val.pkts = 0;
 		new_val.bytes = 0;
 

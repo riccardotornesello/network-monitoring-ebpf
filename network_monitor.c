@@ -35,7 +35,7 @@ static int dump_l3protos_map(struct bpf_map *map)
 	 */
 	err = bpf_map__get_next_key(map, NULL, &key, sizeof(key));
 	while (!err) {
-		struct l3proto_stats val;
+		struct stats_value val;
 		if (bpf_map__lookup_elem(map, &key, sizeof(key), &val,
 					 sizeof(val), 0)) {
 			fprintf(stderr, "Error reading key 0x%04x from map: "
